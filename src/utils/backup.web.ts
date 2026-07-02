@@ -5,13 +5,13 @@ import { AppData, isBackupShape, normalizeData, todayKey } from '../storage';
 
 export const canImportBackup = true;
 
-export async function exportBackup(data: AppData): Promise<boolean> {
+export async function exportBackup(data: AppData, filename?: string): Promise<boolean> {
   try {
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `tracker-list-backup-${todayKey()}.json`;
+    a.download = filename ?? `tracker-list-backup-${todayKey()}.json`;
     document.body.appendChild(a);
     a.click();
     a.remove();

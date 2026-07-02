@@ -17,10 +17,11 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import Svg, { Circle, Line as SvgLine } from 'react-native-svg';
+import Svg, { Circle, Line as SvgLine, Path as SvgPath } from 'react-native-svg';
 import LiveGraph, { GraphPoint } from '../components/LiveGraph';
 import FinaleOverlay from '../components/FinaleOverlay';
 import ShareSheet from '../components/ShareSheet';
+import { exportBackup } from '../utils/backup';
 import { OPACITY, Theme, withAlpha } from '../theme';
 import {
   AppData,
@@ -92,6 +93,15 @@ export default function DrawerScreen({ theme, data, onBack }: Props) {
 
   const { width } = useWindowDimensions();
   const isPad = width >= PAD_BREAKPOINT;
+
+  // 모바일: 그리드가 남는 세로 공간을 넘치지 않게 셀 높이를 맞춘다 (페이지 스크롤 방지)
+  const [wrapH, setWrapH] = useState(0);
+  const cols = isPad ? 4 : 3;
+  const rows = isPad ? 3 : 4;
+  const cabinetW = Math.min(isPad ? 560 : 460, width - 40);
+  const cellNaturalH = cabinetW / cols / 1.15;
+  const cellH =
+    !isPad && wrapH > 0 ? Math.min(cellNaturalH, Math.floor(wrapH / rows)) : undefined;
 
   return (
     <View style={[styles.root, { backgroundColor: theme.bg }]}>
@@ -166,7 +176,10 @@ export default function DrawerScreen({ theme, data, onBack }: Props) {
         </Text>
 
         {/* 3x4 서랍 캐비닛 — 모바일은 남는 세로 공간 중앙 배치, 넓은 화면은 위(캡션 아래)에 붙임 */}
-        <View style={[styles.cabinetWrap, isPad && styles.cabinetWrapPad]}>
+        <View
+          style={[styles.cabinetWrap, isPad && styles.cabinetWrapPad]}
+          onLayout={(e) => setWrapH(e.nativeEvent.layout.height)}
+        >
           <View
             style={[
               styles.cabinet,
@@ -184,6 +197,8 @@ export default function DrawerScreen({ theme, data, onBack }: Props) {
                   style={({ pressed }) => [
                     styles.cell,
                     isPad && styles.cellPad,
+                    // 세로 공간이 부족하면 셀 높이를 줄여 그리드가 화면 안에 들어가게
+                    cellH != null && { height: cellH },
                     { borderColor: withAlpha(theme.fg, 0.14) },
                     hoverMonth === month && { backgroundColor: withAlpha(theme.fg, 0.04) },
                     pressed && { backgroundColor: withAlpha(theme.fg, 0.06) },
@@ -321,6 +336,17 @@ function MonthDetail({
 
   const filled = keys.filter((k) => data.entries[k]?.sentence.trim().length).length;
 
+  // 그 달의 기록만 담은 JSON 내보내기 (웹=다운로드 / 네이티브=공유 시트)
+  const exportMonth = () => {
+    if (month == null) return;
+    const entries: AppData['entries'] = {};
+    for (const k of keys) if (data.entries[k]) entries[k] = data.entries[k];
+    exportBackup(
+      { ...data, entries },
+      `tracker-list-${year}-${String(month).padStart(2, '0')}.json`
+    );
+  };
+
   if (!visible) return null;
 
   const translateY = slide.interpolate({ inputRange: [0, 1], outputRange: [-24, 0] });
@@ -344,6 +370,14 @@ function MonthDetail({
               {year} · {MONTH_LABELS[(month as number) - 1]}
             </Text>
             <View style={styles.sheetHeadRight}>
+              <Pressable
+                onPress={exportMonth}
+                hitSlop={10}
+                accessibilityLabel="월 데이터 내보내기"
+                style={({ pressed }) => ({ opacity: pressed ? 0.4 : 1 })}
+              >
+                <DownloadIcon color={withAlpha(theme.fg, 0.7)} size={20} />
+              </Pressable>
               <Pressable
                 onPress={onShareCard}
                 hitSlop={10}
@@ -390,6 +424,17 @@ function MonthDetail({
         </Animated.View>
       </View>
     </Modal>
+  );
+}
+
+// 모노톤 다운로드 아이콘 (아래 화살표 + 받침)
+function DownloadIcon({ color, size = 20 }: { color: string; size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <SvgLine x1={12} y1={4} x2={12} y2={15} stroke={color} strokeWidth={1.6} />
+      <SvgPath d="M 7.5 11 L 12 15.5 L 16.5 11" stroke={color} strokeWidth={1.6} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      <SvgLine x1={5} y1={19.5} x2={19} y2={19.5} stroke={color} strokeWidth={1.6} strokeLinecap="round" />
+    </Svg>
   );
 }
 

@@ -7,10 +7,10 @@ import { AppData, todayKey } from '../storage';
 
 export const canImportBackup = false;
 
-export async function exportBackup(data: AppData): Promise<boolean> {
+export async function exportBackup(data: AppData, filename?: string): Promise<boolean> {
   try {
     await Share.share({
-      title: `tracker-list-backup-${todayKey()}`,
+      title: filename ?? `tracker-list-backup-${todayKey()}`,
       message: JSON.stringify(data),
     });
     return true;

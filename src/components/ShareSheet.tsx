@@ -1,7 +1,7 @@
 // 공유 시트 — 결산 카드 미리보기 + [이미지 저장] / [SNS 공유]
 // 웹: html-to-image로 카드를 PNG 캡처(다운로드/파일공유). 네이티브: 텍스트 공유로 폴백.
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Modal, Platform, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import RecapCard from './RecapCard';
 import { Theme, withAlpha } from '../theme';
@@ -29,6 +29,7 @@ type Props = {
 
 export default function ShareSheet({ theme, data, period, onClose }: Props) {
   const [status, setStatus] = useState<string>('');
+  const cardRef = useRef<View>(null); // 네이티브 캡처용 (웹은 nativeID 사용)
 
   if (period == null) return null;
 
@@ -58,15 +59,21 @@ export default function ShareSheet({ theme, data, period, onClose }: Props) {
       return;
     }
     setStatus('이미지를 만드는 중…');
-    const ok = await saveCardImage(CARD_ID, filename);
-    setStatus(ok ? '이미지를 저장했어요 ✓' : '저장에 실패했어요');
+    const ok = await saveCardImage(CARD_ID, filename, cardRef);
+    setStatus(
+      ok
+        ? Platform.OS === 'web'
+          ? '이미지를 저장했어요 ✓'
+          : '사진 앨범에 저장했어요 ✓'
+        : '저장에 실패했어요'
+    );
   };
 
   const onShare = async () => {
     // 1) 이미지 파일 공유 시도(모바일 브라우저) → 실패 시 텍스트 공유로 폴백
     if (canCaptureImage) {
       setStatus('공유 준비 중…');
-      const shared = await shareCardImage(CARD_ID, filename, shareText);
+      const shared = await shareCardImage(CARD_ID, filename, shareText, cardRef);
       if (shared) {
         setStatus('');
         return;
@@ -94,8 +101,12 @@ export default function ShareSheet({ theme, data, period, onClose }: Props) {
             contentContainerStyle={styles.preview}
             showsVerticalScrollIndicator={false}
           >
-            {/* 캡처 대상 카드 */}
-            <View style={[styles.cardShadow, { borderColor: withAlpha(theme.fg, 0.12) }]}>
+            {/* 캡처 대상 카드 — ref는 네이티브 캡처용, collapsable=false로 뷰 병합 방지 */}
+            <View
+              ref={cardRef}
+              collapsable={false}
+              style={[styles.cardShadow, { borderColor: withAlpha(theme.fg, 0.12) }]}
+            >
               <RecapCard theme={theme} data={data} year={year} month={month} nativeID={CARD_ID} />
             </View>
           </ScrollView>

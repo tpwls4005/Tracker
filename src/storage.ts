@@ -36,16 +36,29 @@ export function defaultData(): AppData {
   return { habits: [...DEFAULT_HABITS], entries: {}, themeMode: 'system' };
 }
 
+// 외부 JSON(저장본·백업 파일)을 안전한 AppData로 보정 — 백업 불러오기와 로드가 공유
+export function normalizeData(parsed: Partial<AppData>): AppData {
+  return {
+    habits: parsed.habits?.length ? parsed.habits : [...DEFAULT_HABITS],
+    entries: parsed.entries ?? {},
+    themeMode: parsed.themeMode ?? 'system',
+  };
+}
+
+// 백업 JSON이 최소한의 형태를 갖췄는지 검사
+export function isBackupShape(x: unknown): x is Partial<AppData> {
+  if (!x || typeof x !== 'object') return false;
+  const o = x as Record<string, unknown>;
+  if (o.habits != null && !Array.isArray(o.habits)) return false;
+  if (o.entries != null && (typeof o.entries !== 'object' || Array.isArray(o.entries))) return false;
+  return o.habits != null || o.entries != null;
+}
+
 export async function loadData(): Promise<AppData> {
   try {
     const raw = await AsyncStorage.getItem(STORAGE_KEY);
     if (!raw) return defaultData();
-    const parsed = JSON.parse(raw) as Partial<AppData>;
-    return {
-      habits: parsed.habits?.length ? parsed.habits : [...DEFAULT_HABITS],
-      entries: parsed.entries ?? {},
-      themeMode: parsed.themeMode ?? 'system',
-    };
+    return normalizeData(JSON.parse(raw) as Partial<AppData>);
   } catch {
     return defaultData();
   }

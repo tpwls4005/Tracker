@@ -11,9 +11,9 @@ import {
   Platform,
   Pressable,
   ScrollView,
-  Share,
   StyleSheet,
   Text,
+  TextInput,
   useWindowDimensions,
   View,
 } from 'react-native';
@@ -33,6 +33,7 @@ import {
   monthFilledDays,
   monthHasData,
   recordedYears,
+  yearOf,
 } from '../storage';
 
 type Props = {
@@ -57,6 +58,21 @@ export default function DrawerScreen({ theme, data, onBack }: Props) {
   const [openMonth, setOpenMonth] = useState<number | null>(null); // 1~12
   const [shareMonth, setShareMonth] = useState<number | null>(null); // 공유 시트 대상 월
   const [finale, setFinale] = useState(false);
+  const [hoverMonth, setHoverMonth] = useState<number | null>(null); // 웹 hover 셀
+  const [query, setQuery] = useState(''); // 문장 검색어
+
+  // 문장 검색 — 전 연도 대상, 최신순
+  const searchResults = useMemo(() => {
+    const q = query.trim();
+    if (!q) return [];
+    return Object.keys(data.entries)
+      .filter((k) => data.entries[k].sentence.toLowerCase().includes(q.toLowerCase()))
+      .sort((a, b) => (a < b ? 1 : -1))
+      .slice(0, 50);
+  }, [data.entries, query]);
+
+  // 첫 사용자(기록 전무) 여부 — 빈 서랍 안내 카피
+  const hasAnyEntry = useMemo(() => Object.keys(data.entries).length > 0, [data.entries]);
 
   const yearIdx = years.indexOf(year);
   const canPrev = yearIdx < years.length - 1; // 더 과거
@@ -101,8 +117,52 @@ export default function DrawerScreen({ theme, data, onBack }: Props) {
       </View>
 
       <View style={styles.scrollBody}>
+        {/* 문장 검색 — 전 연도의 문장에서 찾는다 */}
+        <View style={[styles.searchRow, { borderBottomColor: withAlpha(theme.fg, query ? 0.3 : 0.12) }]}>
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder="문장 검색"
+            placeholderTextColor={withAlpha(theme.fg, 0.25)}
+            style={[styles.searchInput, { color: theme.fg }]}
+          />
+          {query !== '' && (
+            <Pressable onPress={() => setQuery('')} hitSlop={10}>
+              <Text style={{ color: withAlpha(theme.fg, 0.4), fontSize: 14 }}>✕</Text>
+            </Pressable>
+          )}
+        </View>
+
+        {query.trim() !== '' ? (
+          // ---- 검색 결과 모드 ----
+          <ScrollView style={{ flex: 1, marginTop: 18 }} contentContainerStyle={{ paddingBottom: 20 }}>
+            <Text style={[styles.cabinetCaption, { color: withAlpha(theme.fg, 0.4), textAlign: 'left' }]}>
+              {searchResults.length > 0 ? `${searchResults.length}개의 문장` : '찾는 문장이 없어요'}
+            </Text>
+            {searchResults.map((k) => (
+              <Pressable
+                key={k}
+                style={({ pressed }) => [styles.searchHit, pressed && { opacity: 0.5 }]}
+                onPress={() => {
+                  setYear(yearOf(k));
+                  setOpenMonth(Number(k.split('-')[1]));
+                }}
+              >
+                <Text style={[styles.searchHitDate, { color: withAlpha(theme.fg, 0.35) }]}>
+                  {yearOf(k)} · {formatKorean(k)}
+                </Text>
+                <Text style={[styles.searchHitText, { color: withAlpha(theme.fg, 0.8) }]} numberOfLines={2}>
+                  {data.entries[k].sentence}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        ) : (
+        <>
         <Text style={[styles.cabinetCaption, { color: withAlpha(theme.fg, 0.4), marginTop: isPad ? 84 : 4 }]}>
-          월을 열어 그 달의 기록을 꺼내보세요
+          {hasAnyEntry
+            ? '월을 열어 그 달의 기록을 꺼내보세요'
+            : '첫 문장을 남기면 이 서랍이 채워지기 시작해요'}
         </Text>
 
         {/* 3x4 서랍 캐비닛 — 모바일은 남는 세로 공간 중앙 배치, 넓은 화면은 위(캡션 아래)에 붙임 */}
@@ -125,8 +185,11 @@ export default function DrawerScreen({ theme, data, onBack }: Props) {
                     styles.cell,
                     isPad && styles.cellPad,
                     { borderColor: withAlpha(theme.fg, 0.14) },
+                    hoverMonth === month && { backgroundColor: withAlpha(theme.fg, 0.04) },
                     pressed && { backgroundColor: withAlpha(theme.fg, 0.06) },
                   ]}
+                  onHoverIn={() => setHoverMonth(month)}
+                  onHoverOut={() => setHoverMonth((m) => (m === month ? null : m))}
                   onPress={() => setOpenMonth(month)}
                 >
                   <Text
@@ -178,6 +241,8 @@ export default function DrawerScreen({ theme, data, onBack }: Props) {
             </Text>
           )}
         </View>
+        </>
+        )}
       </View>
 
       <MonthDetail
@@ -282,6 +347,7 @@ function MonthDetail({
               <Pressable
                 onPress={onShareCard}
                 hitSlop={10}
+                accessibilityLabel="결산 카드 공유"
                 style={({ pressed }) => ({ opacity: pressed ? 0.4 : 1 })}
               >
                 <ShareIcon color={withAlpha(theme.fg, 0.7)} size={20} />
@@ -373,6 +439,21 @@ const styles = StyleSheet.create({
   scrollBody: { flex: 1, paddingHorizontal: 20, paddingBottom: 54 },
 
   cabinetCaption: { fontSize: 13, textAlign: 'center', marginTop: 4, marginBottom: 4, letterSpacing: 0.3 },
+
+  // 문장 검색
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    maxWidth: 460,
+    width: '100%',
+    alignSelf: 'center',
+    marginTop: 12,
+  },
+  searchInput: { flex: 1, fontSize: 14, paddingVertical: 8, letterSpacing: 0.3 },
+  searchHit: { paddingVertical: 10, maxWidth: 560, width: '100%', alignSelf: 'center' },
+  searchHitDate: { fontSize: 11, letterSpacing: 0.4, marginBottom: 3 },
+  searchHitText: { fontSize: 15, lineHeight: 22 },
 
   // 남는 세로 공간에서 캐비닛을 중앙 정렬 (하단 공백 최소화)
   cabinetWrap: { flex: 1, justifyContent: 'center' },

@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import LiveGraph, { GraphPoint } from '../components/LiveGraph';
 import { OPACITY, Theme, withAlpha } from '../theme';
+import { canImportBackup, exportBackup, importBackup } from '../utils/backup';
 import {
   AppData,
   DayEntry,
@@ -364,11 +365,36 @@ function HabitEditor({
   demoSentences: string[];
 }) {
   const [names, setNames] = useState<string[]>(data.habits);
+  const [backupStatus, setBackupStatus] = useState('');
 
   // 모달 열릴 때 현재 습관으로 동기화
   React.useEffect(() => {
-    if (visible) setNames(data.habits);
+    if (visible) {
+      setNames(data.habits);
+      setBackupStatus('');
+    }
   }, [visible, data.habits]);
+
+  // 전체 기록을 JSON으로 내보내기 (웹=다운로드 / 네이티브=공유 시트)
+  const doExport = async () => {
+    const ok = await exportBackup(data);
+    setBackupStatus(ok ? '백업 파일을 내보냈어요 ✓' : '내보내기에 실패했어요');
+  };
+
+  // 백업 JSON 불러오기 — 현재 데이터를 통째로 대체
+  const doImport = async () => {
+    if (!canImportBackup) {
+      setBackupStatus('불러오기는 아직 웹에서만 지원돼요');
+      return;
+    }
+    const imported = await importBackup();
+    if (!imported) {
+      setBackupStatus('올바른 백업 파일이 아니에요');
+      return;
+    }
+    update(() => imported);
+    setBackupStatus('기록을 불러왔어요 ✓');
+  };
 
   const setName = (i: number, v: string) => {
     setNames((prev) => prev.map((n, idx) => (idx === i ? v : n)));
@@ -471,6 +497,19 @@ function HabitEditor({
               <Text style={[styles.utilBtn, { color: withAlpha(theme.fg, 0.55) }]}>기록 초기화</Text>
             </Pressable>
           </View>
+
+          {/* 데이터 백업 — 기록이 기기에만 있으므로 내보내기로 안전망 확보 */}
+          <View style={styles.modalUtilRow}>
+            <Pressable onPress={doExport} hitSlop={6}>
+              <Text style={[styles.utilBtn, { color: withAlpha(theme.fg, 0.55) }]}>데이터 내보내기</Text>
+            </Pressable>
+            <Pressable onPress={doImport} hitSlop={6}>
+              <Text style={[styles.utilBtn, { color: withAlpha(theme.fg, 0.55) }]}>데이터 불러오기</Text>
+            </Pressable>
+          </View>
+          {backupStatus !== '' && (
+            <Text style={[styles.backupStatus, { color: withAlpha(theme.fg, 0.45) }]}>{backupStatus}</Text>
+          )}
 
           <View style={styles.modalActions}>
             <Pressable onPress={onClose} style={styles.modalActionBtn}>
@@ -591,6 +630,7 @@ const styles = StyleSheet.create({
   addText: { fontSize: 15, fontWeight: '600' },
   modalDivider: { height: StyleSheet.hairlineWidth, marginVertical: 6 },
   modalUtilRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12 },
+  backupStatus: { fontSize: 12, letterSpacing: 0.3, textAlign: 'center', paddingBottom: 6 },
   utilBtn: { fontSize: 14 },
   modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 8 },
   modalActionBtn: { paddingVertical: 10, paddingHorizontal: 18 },

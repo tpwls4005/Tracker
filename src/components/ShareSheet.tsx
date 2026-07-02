@@ -5,29 +5,52 @@ import React, { useState } from 'react';
 import { Modal, Platform, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import RecapCard from './RecapCard';
 import { Theme, withAlpha } from '../theme';
-import { AppData, MONTH_LABELS, monthAvgRate, monthDayKeys } from '../storage';
+import {
+  AppData,
+  MONTH_LABELS,
+  achievementRate,
+  monthAvgRate,
+  monthDayKeys,
+  yearDayKeys,
+} from '../storage';
 import { canCaptureImage, saveCardImage, shareCardImage } from '../utils/captureCard';
 
 const CARD_ID = 'recap-card';
 
+// month를 주면 월 카드, 생략하면 연간(피날레) 카드
+export type SharePeriod = { year: number; month?: number };
+
 type Props = {
   theme: Theme;
   data: AppData;
-  year: number;
-  month: number | null; // 1~12
+  period: SharePeriod | null;
   onClose: () => void;
 };
 
-export default function ShareSheet({ theme, data, year, month, onClose }: Props) {
+export default function ShareSheet({ theme, data, period, onClose }: Props) {
   const [status, setStatus] = useState<string>('');
 
-  if (month == null) return null;
+  if (period == null) return null;
 
-  const filename = `tracker-${year}-${String(month).padStart(2, '0')}.png`;
-  const filled = monthDayKeys(year, month).filter((k) => data.entries[k]?.sentence.trim().length).length;
-  const avg = monthAvgRate(data.entries, year, month, data.habits.length);
+  const { year, month } = period;
+  const keys = month != null ? monthDayKeys(year, month) : yearDayKeys(year);
+  const filename =
+    month != null ? `tracker-${year}-${String(month).padStart(2, '0')}.png` : `tracker-${year}.png`;
+  const filled = keys.filter((k) => data.entries[k]?.sentence.trim().length).length;
+  const withData = keys.filter((k) => data.entries[k]);
+  const avg =
+    month != null
+      ? monthAvgRate(data.entries, year, month, data.habits.length)
+      : withData.length
+        ? Math.round(
+            withData.reduce((s, k) => s + achievementRate(data.entries[k], data.habits.length), 0) /
+              withData.length
+          )
+        : 0;
   const shareText =
-    `${year} ${MONTH_LABELS[month - 1]} 회고\n기록 ${filled}일 · 평균 달성률 ${avg}%\n— Tracker List`;
+    month != null
+      ? `${year} ${MONTH_LABELS[month - 1]} 회고\n기록 ${filled}일 · 평균 달성률 ${avg}%\n— Tracker List`
+      : `${year} 결산\n한 해 동안 남긴 문장 ${filled}개 · 평균 달성률 ${avg}%\n— Tracker List`;
 
   const onSaveImage = async () => {
     if (!canCaptureImage) {

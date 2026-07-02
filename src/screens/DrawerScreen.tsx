@@ -192,8 +192,7 @@ export default function DrawerScreen({ theme, data, onBack }: Props) {
       <ShareSheet
         theme={theme}
         data={data}
-        year={year}
-        month={shareMonth}
+        period={shareMonth != null ? { year, month: shareMonth } : null}
         onClose={() => setShareMonth(null)}
       />
 
@@ -249,7 +248,8 @@ function MonthDetail({
     () =>
       keys.map((k) => ({
         label: String(dayOfMonth(k)),
-        value: achievementRate(data.entries[k], habitCount),
+        // 기록 없는 날(미래 포함)은 null → 선이 끊겨 '안 한 날'과 '0% 한 날'이 구분된다
+        value: data.entries[k] ? achievementRate(data.entries[k], habitCount) : null,
       })),
     [keys, data.entries, habitCount]
   );

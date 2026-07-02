@@ -10,7 +10,8 @@ import { Animated, Easing, ScrollView, View } from 'react-native';
 import Svg, { Path, Circle, Line } from 'react-native-svg';
 import { OPACITY, Theme, withAlpha } from '../theme';
 
-export type GraphPoint = { label: string; value: number };
+// value=null → "기록이 없는 날": 0%로 찍지 않고 선을 끊는다 (회고 정직성 — 안 한 날과 0% 한 날의 구분)
+export type GraphPoint = { label: string; value: number | null };
 
 type Props = {
   points: GraphPoint[];
@@ -59,19 +60,43 @@ export default function LiveGraph({
   const yFor = (v: number) => chartTop + (1 - v / 100) * (chartBottom - chartTop);
   const baseY = yFor(0);
 
-  const linePts = points.map((p, i) => [xFor(i), yFor(p.value)] as [number, number]);
-  const linePath = linePts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p[0]} ${p[1]}`).join(' ');
-  const areaPath =
-    n > 0
-      ? `${linePath} L ${linePts[n - 1][0]} ${baseY} L ${linePts[0][0]} ${baseY} Z`
-      : '';
+  // null(기록 없음)을 경계로 연속 구간(세그먼트)을 나눈다 — 선·면적은 구간별로만 그린다
+  const segments: number[][] = [];
+  {
+    let cur: number[] = [];
+    points.forEach((p, i) => {
+      if (p.value == null) {
+        if (cur.length) segments.push(cur);
+        cur = [];
+      } else {
+        cur.push(i);
+      }
+    });
+    if (cur.length) segments.push(cur);
+  }
 
-  const lineLen = polylineLength(linePts);
+  const ptFor = (i: number) => [xFor(i), yFor(points[i].value as number)] as [number, number];
+  const lineSegs = segments.filter((s) => s.length >= 2);
+
+  const linePath = lineSegs
+    .map((seg) => seg.map((idx, j) => `${j === 0 ? 'M' : 'L'} ${ptFor(idx)[0]} ${ptFor(idx)[1]}`).join(' '))
+    .join(' ');
+  const areaPath = lineSegs
+    .map((seg) => {
+      const path = seg.map((idx, j) => `${j === 0 ? 'M' : 'L'} ${ptFor(idx)[0]} ${ptFor(idx)[1]}`).join(' ');
+      return `${path} L ${ptFor(seg[seg.length - 1])[0]} ${baseY} L ${ptFor(seg[0])[0]} ${baseY} Z`;
+    })
+    .join(' ');
+
+  const dotIdx = segments.flat(); // 기록이 있는 날만 점을 찍는다
+  const lastIdx = dotIdx.length ? dotIdx[dotIdx.length - 1] : -1;
+
+  const lineLen = lineSegs.reduce((sum, seg) => sum + polylineLength(seg.map(ptFor)), 0);
 
   // ---- 드로잉 애니메이션 (0=가려짐 → 1=완전 노출) ----
   const [progress, setProgress] = useState(animate ? 0 : 1);
   useEffect(() => {
-    if (!animate || containerW === 0 || n < 2) {
+    if (!animate || containerW === 0 || dotIdx.length < 2) {
       setProgress(1);
       return;
     }
@@ -89,7 +114,7 @@ export default function LiveGraph({
       v.removeListener(id);
       a.stop();
     };
-  }, [animate, containerW, n]);
+  }, [animate, containerW, dotIdx.length]);
 
   const dashOffset = lineLen * (1 - progress);
   const arrowReveal = progress > 0.9 ? (progress - 0.9) / 0.1 : 0;
@@ -101,11 +126,12 @@ export default function LiveGraph({
     }
   }, [contentW, containerW, scrollToEnd, n]);
 
-  // 화살표 헤드: 마지막 선분 방향으로 작은 '<' 모양
+  // 화살표 헤드: 마지막 연속 구간의 끝 선분 방향으로 작은 '<' 모양
   let arrowPath = '';
-  if (n > 1) {
-    const [x2, y2] = linePts[n - 1];
-    const [x1, y1] = linePts[n - 2];
+  const lastSeg = lineSegs.length ? lineSegs[lineSegs.length - 1] : null;
+  if (lastSeg && lastSeg[lastSeg.length - 1] === lastIdx) {
+    const [x2, y2] = ptFor(lastSeg[lastSeg.length - 1]);
+    const [x1, y1] = ptFor(lastSeg[lastSeg.length - 2]);
     const ang = Math.atan2(y2 - y1, x2 - x1);
     const L = 9;
     const spread = 0.5;
@@ -138,12 +164,12 @@ export default function LiveGraph({
               stroke={withAlpha(theme.fg, OPACITY.hairline)}
               strokeWidth={1}
             />
-            {/* 하단 면적 (5% 투명도) */}
-            {n > 0 && (
+            {/* 하단 면적 (5% 투명도) — 기록이 있는 구간만 */}
+            {areaPath !== '' && (
               <Path d={areaPath} fill={withAlpha(theme.fg, OPACITY.graphFill)} fillOpacity={progress} />
             )}
-            {/* 꺾은선 (드로잉) */}
-            {n > 1 && (
+            {/* 꺾은선 (드로잉) — 기록 없는 날에서 선이 끊긴다 */}
+            {linePath !== '' && lineLen > 0 && (
               <Path
                 d={linePath}
                 stroke={theme.fg}
@@ -155,15 +181,16 @@ export default function LiveGraph({
                 strokeDashoffset={dashOffset}
               />
             )}
-            {/* 데이터 점 — 드로잉 진행에 맞춰 좌→우로 등장 */}
-            {linePts.map(([x, y], i) => {
+            {/* 데이터 점 — 기록이 있는 날만, 드로잉 진행에 맞춰 좌→우로 등장 */}
+            {dotIdx.map((i) => {
+              const [x, y] = ptFor(i);
               const appearAt = n > 1 ? i / (n - 1) : 0;
               return (
                 <Circle
                   key={i}
                   cx={x}
                   cy={y}
-                  r={i === n - 1 ? 4 : 2.5}
+                  r={i === lastIdx ? 4 : 2.5}
                   fill={theme.fg}
                   opacity={progress >= appearAt ? 1 : 0}
                 />

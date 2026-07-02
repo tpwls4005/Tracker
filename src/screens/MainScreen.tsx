@@ -113,7 +113,11 @@ export default function MainScreen({ theme, data, update, onOpenDrawer }: Props)
     () =>
       Array.from({ length: RECENT_DAYS }, (_, i) => {
         const k = shiftKey(tk, -(RECENT_DAYS - 1 - i));
-        return { label: String(dayOfMonth(k)), value: achievementRate(data.entries[k], habits.length) };
+        // 기록이 아예 없는 날은 0%가 아니라 null → 그래프에서 선이 끊긴다
+        return {
+          label: String(dayOfMonth(k)),
+          value: data.entries[k] ? achievementRate(data.entries[k], habits.length) : null,
+        };
       }),
     [data.entries, habits.length, tk]
   );

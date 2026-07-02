@@ -13,13 +13,13 @@ import {
   Easing,
   Platform,
   Pressable,
-  Share,
   StyleSheet,
   Text,
   useWindowDimensions,
   View,
 } from 'react-native';
 import Svg, { Path, Circle, Line, Text as SvgText } from 'react-native-svg';
+import ShareSheet from './ShareSheet';
 import { OPACITY, Theme, withAlpha } from '../theme';
 import {
   AppData,
@@ -50,6 +50,7 @@ function creditOpacity(i: number): number {
 export default function FinaleOverlay({ theme, data, year, onClose }: Props) {
   const { width: screenW, height: screenH } = useWindowDimensions();
   const [phase, setPhase] = useState<Phase>('credits');
+  const [shareOpen, setShareOpen] = useState(false); // Phase 4: 연간 결산 카드 공유 시트
   const habitCount = data.habits.length;
 
   // ---- 데이터 준비 ----
@@ -61,13 +62,14 @@ export default function FinaleOverlay({ theme, data, year, onClose }: Props) {
     [year, data.entries]
   );
 
-  // 일별 달성률 + 월 시작 인덱스(라벨용)
+  // 일별 달성률(기록 없는 날=null → 선 끊김) + 월 시작 인덱스(라벨용)
   const { dayVals, monthTicks } = useMemo(() => {
-    const vals: number[] = [];
+    const vals: (number | null)[] = [];
     const ticks: { label: string; idx: number }[] = [];
     for (let m = 1; m <= 12; m++) {
       ticks.push({ label: MONTH_LABELS[m - 1], idx: vals.length });
-      for (const k of monthDayKeys(year, m)) vals.push(achievementRate(data.entries[k], habitCount));
+      for (const k of monthDayKeys(year, m))
+        vals.push(data.entries[k] ? achievementRate(data.entries[k], habitCount) : null);
     }
     return { dayVals: vals, monthTicks: ticks };
   }, [year, data.entries, habitCount]);
@@ -92,15 +94,39 @@ export default function FinaleOverlay({ theme, data, year, onClose }: Props) {
   const xFor = (i: number) => PAD_X + i * spacing;
   const yFor = (v: number) => topY + (1 - v / 100) * (bottomY - topY);
 
-  const linePts = dayVals.map((v, i) => [xFor(i), yFor(v)] as [number, number]);
-  const linePath = linePts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p[0]} ${p[1]}`).join(' ');
-  const areaPath =
-    n > 0 ? `${linePath} L ${linePts[n - 1][0]} ${yFor(0)} L ${linePts[0][0]} ${yFor(0)} Z` : '';
+  // 기록 없는 날(null)을 경계로 연속 구간을 나눠 선·면적을 구간별로 그린다
+  const segments: number[][] = [];
+  {
+    let cur: number[] = [];
+    dayVals.forEach((v, i) => {
+      if (v == null) {
+        if (cur.length) segments.push(cur);
+        cur = [];
+      } else {
+        cur.push(i);
+      }
+    });
+    if (cur.length) segments.push(cur);
+  }
+  const ptFor = (i: number) => [xFor(i), yFor(dayVals[i] as number)] as [number, number];
+  const lineSegs = segments.filter((s) => s.length >= 2);
+  const linePath = lineSegs
+    .map((seg) => seg.map((idx, j) => `${j === 0 ? 'M' : 'L'} ${ptFor(idx)[0]} ${ptFor(idx)[1]}`).join(' '))
+    .join(' ');
+  const areaPath = lineSegs
+    .map((seg) => {
+      const p = seg.map((idx, j) => `${j === 0 ? 'M' : 'L'} ${ptFor(idx)[0]} ${ptFor(idx)[1]}`).join(' ');
+      return `${p} L ${ptFor(seg[seg.length - 1])[0]} ${yFor(0)} L ${ptFor(seg[0])[0]} ${yFor(0)} Z`;
+    })
+    .join(' ');
+  const dotIdxAll = segments.flat();
+  const lastIdx = dotIdxAll.length ? dotIdxAll[dotIdxAll.length - 1] : -1;
 
   let arrowPath = '';
-  if (n > 1) {
-    const [x2, y2] = linePts[n - 1];
-    const [x1, y1] = linePts[n - 2];
+  const lastSeg = lineSegs.length ? lineSegs[lineSegs.length - 1] : null;
+  if (lastSeg && lastSeg[lastSeg.length - 1] === lastIdx) {
+    const [x2, y2] = ptFor(lastSeg[lastSeg.length - 1]);
+    const [x1, y1] = ptFor(lastSeg[lastSeg.length - 2]);
     const ang = Math.atan2(y2 - y1, x2 - x1);
     const L = 10;
     const sp = 0.5;
@@ -183,19 +209,6 @@ export default function FinaleOverlay({ theme, data, year, onClose }: Props) {
       v.removeListener(id);
     };
   }, [phase, msgOpacity, controlsOpacity]);
-
-  const share = async () => {
-    try {
-      await Share.share({
-        message:
-          `${year} Tracker List 결산\n` +
-          `한 해 동안 남긴 문장 ${sentences.length}개 · 평균 달성률 ${avgRate}%\n\n` +
-          `"${FINALE_MESSAGE}"`,
-      });
-    } catch {
-      // 공유 취소/미지원은 조용히 무시
-    }
-  };
 
   const showGraph = phase === 'graph' || phase === 'final';
 
@@ -284,9 +297,9 @@ export default function FinaleOverlay({ theme, data, year, onClose }: Props) {
                   </React.Fragment>
                 ))}
                 {/* 하단 면적 5% */}
-                {n > 0 && <Path d={areaPath} fill={withAlpha(theme.fg, OPACITY.graphFill)} />}
+                {areaPath !== '' && <Path d={areaPath} fill={withAlpha(theme.fg, OPACITY.graphFill)} />}
                 {/* 마스터 꺾은선 */}
-                {n > 1 && (
+                {linePath !== '' && (
                   <Path
                     d={linePath}
                     stroke={theme.fg}
@@ -307,11 +320,11 @@ export default function FinaleOverlay({ theme, data, year, onClose }: Props) {
                     fill="none"
                   />
                 )}
-                {/* 12/31 끝점 — Phase 3에서 점멸 */}
-                {n > 0 && (
+                {/* 마지막 기록일 끝점 — Phase 3에서 점멸 */}
+                {lastIdx >= 0 && (
                   <Circle
-                    cx={linePts[n - 1][0]}
-                    cy={linePts[n - 1][1]}
+                    cx={ptFor(lastIdx)[0]}
+                    cy={ptFor(lastIdx)[1]}
                     r={5}
                     fill={theme.fg}
                     opacity={phase === 'final' ? dotOp : 1}
@@ -341,7 +354,7 @@ export default function FinaleOverlay({ theme, data, year, onClose }: Props) {
 
               <Pressable
                 style={[styles.shareBtn, { backgroundColor: theme.fg }]}
-                onPress={share}
+                onPress={() => setShareOpen(true)}
               >
                 <Text style={[styles.shareText, { color: theme.bg }]}>결산 카드 공유</Text>
               </Pressable>
@@ -352,6 +365,14 @@ export default function FinaleOverlay({ theme, data, year, onClose }: Props) {
           )}
         </View>
       )}
+
+      {/* Phase 4: 연간 결산 카드 공유 시트 — 월 카드와 동일한 RecapCard 문법 */}
+      <ShareSheet
+        theme={theme}
+        data={data}
+        period={shareOpen ? { year } : null}
+        onClose={() => setShareOpen(false)}
+      />
     </View>
   );
 }

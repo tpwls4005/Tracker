@@ -16,7 +16,6 @@ import {
 } from 'react-native';
 import LiveGraph, { GraphPoint } from '../components/LiveGraph';
 import { OPACITY, Theme, withAlpha } from '../theme';
-import { canImportBackup, exportBackup, importBackup } from '../utils/backup';
 import {
   AppData,
   DayEntry,
@@ -65,7 +64,9 @@ export default function MainScreen({ theme, data, update, onOpenDrawer }: Props)
   const [draft, setDraft] = useState<string>(todayEntry?.sentence ?? '');
   const [editing, setEditing] = useState(false);
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [inputFocused, setInputFocused] = useState(false); // 글자 수는 쓰는 동안만 보여준다
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // 문장 즉시 저장 (체크 토글 등으로 인한 유실 방지)
   const commitSentence = (text: string) => {
@@ -79,12 +80,17 @@ export default function MainScreen({ theme, data, update, onOpenDrawer }: Props)
   };
 
   // 입력 시 매번 자동 저장됨 — 상태 표시만 갱신 (별도 저장 버튼 없음)
+  // '자동 저장됨 ✓'는 2초 뒤 사라져 화면을 비워둔다 (아래 '편집'과의 시각 혼선 방지)
   const onChangeSentence = (text: string) => {
     setDraft(text);
     commitSentence(text);
     if (savedTimer.current) clearTimeout(savedTimer.current);
+    if (idleTimer.current) clearTimeout(idleTimer.current);
     setSaveState('saving');
-    savedTimer.current = setTimeout(() => setSaveState('saved'), 700);
+    savedTimer.current = setTimeout(() => {
+      setSaveState('saved');
+      idleTimer.current = setTimeout(() => setSaveState('idle'), 2000);
+    }, 700);
   };
 
   const toggleHabit = (i: number) => {
@@ -186,6 +192,8 @@ export default function MainScreen({ theme, data, update, onOpenDrawer }: Props)
         placeholder="오늘을 한 줄로 남겨보세요"
         placeholderTextColor={withAlpha(theme.fg, 0.3)}
         multiline
+        onFocus={() => setInputFocused(true)}
+        onBlur={() => setInputFocused(false)}
         style={[
           styles.todayInput,
           {
@@ -195,13 +203,16 @@ export default function MainScreen({ theme, data, update, onOpenDrawer }: Props)
           },
         ]}
       />
+      {/* 쓰는 동안만 보이는 보조 정보 — 평소엔 비워 아래 '편집'과 혼선이 없다 */}
       <View style={styles.sentenceFoot}>
         <Text style={[styles.saveState, { color: withAlpha(theme.fg, 0.4) }]}>
           {saveState === 'saving' ? '저장 중…' : saveState === 'saved' ? '자동 저장됨 ✓' : ''}
         </Text>
-        <Text style={[styles.counter, { color: withAlpha(theme.fg, 0.35) }]}>
-          {draft.length} / {SENTENCE_MAX}
-        </Text>
+        {inputFocused && (
+          <Text style={[styles.counter, { color: withAlpha(theme.fg, 0.35) }]}>
+            {draft.length} / {SENTENCE_MAX}
+          </Text>
+        )}
       </View>
     </View>
   );
@@ -365,36 +376,11 @@ function HabitEditor({
   demoSentences: string[];
 }) {
   const [names, setNames] = useState<string[]>(data.habits);
-  const [backupStatus, setBackupStatus] = useState('');
 
   // 모달 열릴 때 현재 습관으로 동기화
   React.useEffect(() => {
-    if (visible) {
-      setNames(data.habits);
-      setBackupStatus('');
-    }
+    if (visible) setNames(data.habits);
   }, [visible, data.habits]);
-
-  // 전체 기록을 JSON으로 내보내기 (웹=다운로드 / 네이티브=공유 시트)
-  const doExport = async () => {
-    const ok = await exportBackup(data);
-    setBackupStatus(ok ? '백업 파일을 내보냈어요 ✓' : '내보내기에 실패했어요');
-  };
-
-  // 백업 JSON 불러오기 — 현재 데이터를 통째로 대체
-  const doImport = async () => {
-    if (!canImportBackup) {
-      setBackupStatus('불러오기는 아직 웹에서만 지원돼요');
-      return;
-    }
-    const imported = await importBackup();
-    if (!imported) {
-      setBackupStatus('올바른 백업 파일이 아니에요');
-      return;
-    }
-    update(() => imported);
-    setBackupStatus('기록을 불러왔어요 ✓');
-  };
 
   const setName = (i: number, v: string) => {
     setNames((prev) => prev.map((n, idx) => (idx === i ? v : n)));
@@ -498,18 +484,6 @@ function HabitEditor({
             </Pressable>
           </View>
 
-          {/* 데이터 백업 — 기록이 기기에만 있으므로 내보내기로 안전망 확보 */}
-          <View style={styles.modalUtilRow}>
-            <Pressable onPress={doExport} hitSlop={6}>
-              <Text style={[styles.utilBtn, { color: withAlpha(theme.fg, 0.55) }]}>데이터 내보내기</Text>
-            </Pressable>
-            <Pressable onPress={doImport} hitSlop={6}>
-              <Text style={[styles.utilBtn, { color: withAlpha(theme.fg, 0.55) }]}>데이터 불러오기</Text>
-            </Pressable>
-          </View>
-          {backupStatus !== '' && (
-            <Text style={[styles.backupStatus, { color: withAlpha(theme.fg, 0.45) }]}>{backupStatus}</Text>
-          )}
 
           <View style={styles.modalActions}>
             <Pressable onPress={onClose} style={styles.modalActionBtn}>
@@ -569,6 +543,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginTop: 12,
+    minHeight: 16, // 내용이 비어도 높이 고정 (레이아웃 점프 방지)
   },
   saveState: { fontSize: 12, letterSpacing: 0.3 },
 
@@ -630,7 +605,6 @@ const styles = StyleSheet.create({
   addText: { fontSize: 15, fontWeight: '600' },
   modalDivider: { height: StyleSheet.hairlineWidth, marginVertical: 6 },
   modalUtilRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12 },
-  backupStatus: { fontSize: 12, letterSpacing: 0.3, textAlign: 'center', paddingBottom: 6 },
   utilBtn: { fontSize: 14 },
   modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 8 },
   modalActionBtn: { paddingVertical: 10, paddingHorizontal: 18 },

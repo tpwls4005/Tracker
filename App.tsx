@@ -94,7 +94,9 @@ export default function App() {
       />
     );
   } else {
-    content = <DrawerScreen theme={theme} data={data} onBack={() => setScreen('main')} />;
+    content = (
+      <DrawerScreen theme={theme} data={data} update={update} onBack={() => setScreen('main')} />
+    );
   }
 
   return (

@@ -21,7 +21,7 @@ import Svg, { Circle, Line as SvgLine, Path as SvgPath } from 'react-native-svg'
 import LiveGraph, { GraphPoint } from '../components/LiveGraph';
 import FinaleOverlay from '../components/FinaleOverlay';
 import ShareSheet from '../components/ShareSheet';
-import { exportBackup } from '../utils/backup';
+import { canImportBackup, exportBackup, importBackup } from '../utils/backup';
 import { OPACITY, Theme, withAlpha } from '../theme';
 import {
   AppData,
@@ -40,12 +40,13 @@ import {
 type Props = {
   theme: Theme;
   data: AppData;
+  update: (updater: (d: AppData) => AppData) => void;
   onBack: () => void;
 };
 
 const PAD_BREAKPOINT = 768;
 
-export default function DrawerScreen({ theme, data, onBack }: Props) {
+export default function DrawerScreen({ theme, data, update, onBack }: Props) {
   const nowYear = new Date().getFullYear();
 
   // 기록이 있는 연도 + 올해를 후보로, 최신순 정렬
@@ -74,6 +75,22 @@ export default function DrawerScreen({ theme, data, onBack }: Props) {
 
   // 첫 사용자(기록 전무) 여부 — 빈 서랍 안내 카피
   const hasAnyEntry = useMemo(() => Object.keys(data.entries).length > 0, [data.entries]);
+
+  // 백업 JSON 불러오기 — 현재 데이터를 통째로 대체 (웹 전용)
+  const [importStatus, setImportStatus] = useState('');
+  const doImport = async () => {
+    if (!canImportBackup) {
+      setImportStatus('불러오기는 아직 웹에서만 지원돼요');
+      return;
+    }
+    const imported = await importBackup();
+    if (!imported) {
+      setImportStatus('올바른 백업 파일이 아니에요');
+      return;
+    }
+    update(() => imported);
+    setImportStatus('기록을 불러왔어요 ✓');
+  };
 
   const yearIdx = years.indexOf(year);
   const canPrev = yearIdx < years.length - 1; // 더 과거
@@ -256,6 +273,13 @@ export default function DrawerScreen({ theme, data, onBack }: Props) {
             </Text>
           )}
         </View>
+
+        {/* 백업 복원 — 서랍의 맨 아래, 존재감 없이 */}
+        <Pressable onPress={doImport} hitSlop={8} style={styles.importRow}>
+          <Text style={[styles.importText, { color: withAlpha(theme.fg, 0.25) }]}>
+            {importStatus || '백업 불러오기'}
+          </Text>
+        </Pressable>
         </>
         )}
       </View>
@@ -539,6 +563,8 @@ const styles = StyleSheet.create({
   },
   finaleBtnText: { fontSize: 15, fontWeight: '600', letterSpacing: 0.5 },
   finaleTeaser: { fontSize: 12.5, letterSpacing: 0.3, textAlign: 'center' },
+  importRow: { alignItems: 'center', marginTop: 14 },
+  importText: { fontSize: 11, letterSpacing: 0.4 },
 
   // 월 상세 시트
   sheetBackdrop: { flex: 1, justifyContent: 'flex-start' },

@@ -8,9 +8,11 @@ import { useFonts } from 'expo-font';
 import { AppData, loadData, saveData } from './src/storage';
 import { lightTheme } from './src/theme';
 import { installWebFont } from './src/webFont';
+import { shouldAutoFinale } from './src/utils/autoFinale';
 import LandingScreen from './src/screens/LandingScreen';
 import MainScreen from './src/screens/MainScreen';
 import DrawerScreen from './src/screens/DrawerScreen';
+import FinaleOverlay from './src/components/FinaleOverlay';
 
 // 웹 전역 폰트(조선신명조) 강제 — 모듈 로드 시 1회
 installWebFont();
@@ -73,6 +75,22 @@ export default function App() {
     setData((prev) => (prev ? updater(prev) : prev));
   }, []);
 
+  // 연말 자동 피날레 — 메인 진입 시 판정 (12/31~1/7 창, 그 해 기록 존재, 연 1회)
+  const [autoFinale, setAutoFinale] = useState<number | null>(null);
+  useEffect(() => {
+    if (screen !== 'main' || !data) return;
+    const y = shouldAutoFinale(data, new Date());
+    if (y != null) setAutoFinale(y);
+  }, [screen, data]);
+
+  const closeAutoFinale = useCallback(() => {
+    if (autoFinale != null) {
+      const y = autoFinale;
+      update((d) => ({ ...d, finaleSeenYear: y }));
+    }
+    setAutoFinale(null);
+  }, [autoFinale, update]);
+
   // 데이터·폰트 준비 전: 빈 배경만
   if (!data || !fontsLoaded) {
     return <View style={{ flex: 1, backgroundColor: theme.bg }} />;
@@ -105,6 +123,9 @@ export default function App() {
       <AnimatedScreen key={screen} dir={dir}>
         {content}
       </AnimatedScreen>
+      {autoFinale != null && (
+        <FinaleOverlay theme={theme} data={data} year={autoFinale} onClose={closeAutoFinale} />
+      )}
     </View>
   );
 }

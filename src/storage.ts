@@ -15,6 +15,7 @@ export type AppData = {
   habits: string[]; // 6~10개 핵심 습관
   entries: Record<string, DayEntry>; // key: YYYY-MM-DD
   themeMode: ThemeMode;
+  finaleSeenYear?: number; // 자동 피날레를 이미 본 연도 — 같은 해에 다시 띄우지 않기 위한 플래그
 };
 
 export const HABIT_MIN = 6;
@@ -42,6 +43,7 @@ export function normalizeData(parsed: Partial<AppData>): AppData {
     habits: parsed.habits?.length ? parsed.habits : [...DEFAULT_HABITS],
     entries: parsed.entries ?? {},
     themeMode: parsed.themeMode ?? 'system',
+    ...(typeof parsed.finaleSeenYear === 'number' ? { finaleSeenYear: parsed.finaleSeenYear } : {}),
   };
 }
 

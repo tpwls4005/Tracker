@@ -76,14 +76,15 @@ export default function DrawerScreen({ theme, data, update, onBack }: Props) {
   // 첫 사용자(기록 전무) 여부 — 빈 서랍 안내 카피
   const hasAnyEntry = useMemo(() => Object.keys(data.entries).length > 0, [data.entries]);
 
-  // 백업 JSON 불러오기 — 현재 데이터를 통째로 대체 (웹 전용)
+  // 백업 JSON 불러오기 — 현재 데이터를 통째로 대체
   const [importStatus, setImportStatus] = useState('');
   const doImport = async () => {
     if (!canImportBackup) {
-      setImportStatus('불러오기는 아직 웹에서만 지원돼요');
+      setImportStatus('이 기기에서는 불러오기를 지원하지 않아요');
       return;
     }
     const imported = await importBackup();
+    if (imported === 'cancelled') return; // 픽커만 닫은 경우 — 조용히
     if (!imported) {
       setImportStatus('올바른 백업 파일이 아니에요');
       return;

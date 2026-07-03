@@ -22,11 +22,15 @@ export async function exportBackup(data: AppData, filename?: string): Promise<bo
   }
 }
 
-export function importBackup(): Promise<AppData | null> {
+// 'cancelled' = 사용자가 픽커를 닫음(오류 아님), null = 파일이 백업 형태가 아님
+export type ImportResult = AppData | 'cancelled' | null;
+
+export function importBackup(): Promise<ImportResult> {
   return new Promise((resolve) => {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'application/json,.json';
+    input.oncancel = () => resolve('cancelled');
     input.onchange = () => {
       const file = input.files?.[0];
       if (!file) return resolve(null);

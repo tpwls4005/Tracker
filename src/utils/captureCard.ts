@@ -5,8 +5,16 @@
 
 import type { RefObject } from 'react';
 import { captureRef } from 'react-native-view-shot';
-import * as MediaLibrary from 'expo-media-library';
 import * as Sharing from 'expo-sharing';
+
+// SDK 57 주의: Expo Go에는 media-library 네이티브 모듈(ExpoMediaLibraryNext)이 없어
+// 정적 import 시 앱 부팅 자체가 죽는다 → 지연 require + 실패 시 null (공유 시트로 대체)
+let MediaLibrary: typeof import('expo-media-library') | null = null;
+try {
+  MediaLibrary = require('expo-media-library');
+} catch {
+  MediaLibrary = null;
+}
 
 export const canCaptureImage = true;
 
@@ -27,6 +35,16 @@ export async function saveCardImage(
 ): Promise<boolean> {
   const uri = await renderPng(ref);
   if (!uri) return false;
+  // Expo Go처럼 media-library가 없는 환경: 공유 시트로 대체 (거기서 갤러리 저장 가능)
+  if (!MediaLibrary) {
+    try {
+      if (!(await Sharing.isAvailableAsync())) return false;
+      await Sharing.shareAsync(uri, { mimeType: 'image/png' });
+      return true;
+    } catch {
+      return false;
+    }
+  }
   try {
     const perm = await MediaLibrary.requestPermissionsAsync(true); // writeOnly
     if (!perm.granted) return false;

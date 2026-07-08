@@ -22,7 +22,6 @@ import {
   HABIT_MIN,
   SENTENCE_MAX,
   achievementRate,
-  dateKey,
   dayOfMonth,
   formatKorean,
   monthKeys,
@@ -38,19 +37,6 @@ type Props = {
 };
 
 const PAD_BREAKPOINT = 768;
-
-const DEMO_SENTENCES = [
-  '작게 시작한 하루가 생각보다 단단했다.',
-  '미루지 않은 것만으로 충분한 날.',
-  '오늘은 나에게 조금 더 친절했다.',
-  '흐트러진 마음을 한 줄로 붙잡았다.',
-  '완벽하진 않아도 멈추진 않았다.',
-  '몸을 움직이니 생각도 가벼워졌다.',
-  '비가 와서 마음까지 차분해진 하루.',
-  '쉬어가는 것도 트래킹의 일부.',
-  '어제의 나에게 부끄럽지 않았다.',
-  '작은 습관이 모여 방향이 된다.',
-];
 
 export default function MainScreen({ theme, data, update, onOpenDrawer }: Props) {
   const tk = todayKey();
@@ -254,7 +240,7 @@ export default function MainScreen({ theme, data, update, onOpenDrawer }: Props)
   );
 
   const GraphSection = (
-    <View style={{ marginTop: 30 }}>
+    <View style={{ marginTop: 22 }}>
       <View style={styles.sectionHead}>
         <Text style={[styles.sectionTitle, { color: theme.fg }]}>최근 7일 달성 추이</Text>
         <Text style={[styles.ratePill, { color: theme.fg }]}>{todayRate}%</Text>
@@ -351,7 +337,6 @@ export default function MainScreen({ theme, data, update, onOpenDrawer }: Props)
         data={data}
         update={update}
         onClose={() => setEditing(false)}
-        demoSentences={DEMO_SENTENCES}
       />
     </View>
   );
@@ -365,14 +350,12 @@ function HabitEditor({
   data,
   update,
   onClose,
-  demoSentences,
 }: {
   visible: boolean;
   theme: Theme;
   data: AppData;
   update: (updater: (d: AppData) => AppData) => void;
   onClose: () => void;
-  demoSentences: string[];
 }) {
   const [names, setNames] = useState<string[]>(data.habits);
 
@@ -394,44 +377,6 @@ function HabitEditor({
   const save = () => {
     const cleaned = names.map((n, i) => n.trim() || `습관 ${i + 1}`);
     update((d) => ({ ...d, habits: cleaned }));
-    onClose();
-  };
-
-  // 올해 1/1 ~ 12/31 전체를 데모로 채운다 (12개월 서랍·365일 피날레 미리보기용)
-  const fillDemo = () => {
-    update((d) => {
-      const entries = { ...d.entries };
-      const H = d.habits.length;
-      const year = new Date().getFullYear();
-      const total = Math.round((new Date(year, 11, 31).getTime() - new Date(year, 0, 1).getTime()) / 86400000) + 1;
-
-      for (let i = 0; i < total; i++) {
-        const k = dateKey(new Date(year, 0, 1 + i));
-
-        // 한 해에 걸친 완만한 우상향 추세 + 계절성 등락
-        const t = i / (total - 1);
-        let rate = 0.3 + 0.5 * t + 0.13 * Math.sin(t * Math.PI * 5);
-        rate = Math.max(0, Math.min(1, rate));
-
-        // 달성률을 습관 개수로 환산 후, 어떤 습관이 체크됐는지 셔플로 자연 분산
-        const numChecked = Math.max(0, Math.min(H, Math.round(rate * H)));
-        const idx = d.habits.map((_, j) => j);
-        for (let j = idx.length - 1; j > 0; j--) {
-          const r = Math.floor(Math.random() * (j + 1));
-          [idx[j], idx[r]] = [idx[r], idx[j]];
-        }
-        const checks = d.habits.map(() => false);
-        for (let j = 0; j < numChecked; j++) checks[idx[j]] = true;
-
-        entries[k] = { sentence: demoSentences[(i * 3 + 1) % demoSentences.length], checks, habitCount: H };
-      }
-      return { ...d, entries };
-    });
-    onClose();
-  };
-
-  const resetEntries = () => {
-    update((d) => ({ ...d, entries: {} }));
     onClose();
   };
 
@@ -472,18 +417,6 @@ function HabitEditor({
             </Text>
           </Pressable>
 
-          <View style={[styles.modalDivider, { backgroundColor: withAlpha(theme.fg, OPACITY.hairline) }]} />
-
-          <View style={styles.modalUtilRow}>
-            <Pressable onPress={fillDemo} hitSlop={6}>
-              <Text style={[styles.utilBtn, { color: withAlpha(theme.fg, 0.55) }]}>올해 데모 채우기</Text>
-            </Pressable>
-            <Pressable onPress={resetEntries} hitSlop={6}>
-              <Text style={[styles.utilBtn, { color: withAlpha(theme.fg, 0.55) }]}>기록 초기화</Text>
-            </Pressable>
-          </View>
-
-
           <View style={styles.modalActions}>
             <Pressable onPress={onClose} style={styles.modalActionBtn}>
               <Text style={[styles.modalActionText, { color: withAlpha(theme.fg, 0.55) }]}>취소</Text>
@@ -520,7 +453,7 @@ const styles = StyleSheet.create({
   headerDate: { fontSize: 13 },
   linkBtn: { fontSize: 15 },
 
-  mobileContent: { paddingHorizontal: 24, paddingBottom: 80, paddingTop: 8 },
+  mobileContent: { paddingHorizontal: 24, paddingBottom: 16, paddingTop: 8 },
 
   padRow: { flex: 1, flexDirection: 'row', paddingHorizontal: 24, paddingTop: 8 },
   padLeft: { flex: 1 },
@@ -602,10 +535,7 @@ const styles = StyleSheet.create({
   removeBtn: { fontSize: 16 },
   addRow: { paddingVertical: 14 },
   addText: { fontSize: 15, fontWeight: '600' },
-  modalDivider: { height: StyleSheet.hairlineWidth, marginVertical: 6 },
-  modalUtilRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12 },
-  utilBtn: { fontSize: 14 },
-  modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 8 },
+  modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 20 },
   modalActionBtn: { paddingVertical: 10, paddingHorizontal: 18 },
   modalActionText: { fontSize: 15 },
 });

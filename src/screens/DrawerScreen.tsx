@@ -186,13 +186,7 @@ export default function DrawerScreen({ theme, data, update, onBack }: Props) {
           </ScrollView>
         ) : (
         <>
-        <Text style={[styles.cabinetCaption, { color: withAlpha(theme.fg, 0.4), marginTop: isPad ? 84 : 4 }]}>
-          {hasAnyEntry
-            ? '월을 열어 그 달의 기록을 꺼내보세요'
-            : '첫 문장을 남기면 이 서랍이 채워지기 시작해요'}
-        </Text>
-
-        {/* 3x4 서랍 캐비닛 — 모바일은 남는 세로 공간 중앙 배치, 넓은 화면은 위(캡션 아래)에 붙임 */}
+        {/* 3x4 서랍 캐비닛 — 모바일은 남는 세로 공간 중앙 배치, 넓은 화면은 위에 붙임 */}
         <View
           style={[styles.cabinetWrap, isPad && styles.cabinetWrapPad]}
           onLayout={(e) => setWrapH(e.nativeEvent.layout.height)}
@@ -245,34 +239,35 @@ export default function DrawerScreen({ theme, data, update, onBack }: Props) {
         {/* 넓은 화면: 캐비닛과 결산 사이 여백을 밀어 결산/티저를 맨 아래로 */}
         {isPad && <View style={{ flex: 1 }} />}
 
-        {/* 1년 결산 — 노출 가능하면 회색 버튼, 아니면 하단에 작은 티저 (넓은 화면은 바닥에서 살짝 띄움) */}
-        <View style={[styles.finaleZone, isPad && { marginBottom: 26 }]}>
-          {showFinale ? (
-            <>
-              <Text style={[styles.finaleProgress, { color: withAlpha(theme.fg, 0.35) }]}>
-                {filledMonths} / 12개월 기록됨
-              </Text>
-              <Pressable
-                style={({ pressed }) => [
-                  styles.finaleBtn,
-                  { borderColor: withAlpha(theme.fg, 0.28), backgroundColor: pressed ? withAlpha(theme.fg, 0.06) : 'transparent' },
-                ]}
-                onPress={() => setFinale(true)}
-              >
-                <Text style={[styles.finaleBtnText, { color: withAlpha(theme.fg, 0.5) }]}>
-                  {year} 결산 보기
-                </Text>
-              </Pressable>
-              <Text style={[styles.finaleTeaser, { color: withAlpha(theme.fg, 0.3) }]}>
-                한 해 동안 남긴 문장과 달성 궤적을 한 편의 결산으로 되짚어드려요
-              </Text>
-            </>
-          ) : (
-            <Text style={[styles.finaleTeaser, { color: withAlpha(theme.fg, 0.32) }]}>
-              12월이 되면, 한 해 동안 남긴 문장이 모여 결산 피날레로 흘러가요
+        {/* 1년 결산 — 노출 가능할 때만 회색 버튼 (넓은 화면은 바닥에서 살짝 띄움) */}
+        {showFinale && (
+          <View style={[styles.finaleZone, isPad && { marginBottom: 26 }]}>
+            <Text style={[styles.finaleProgress, { color: withAlpha(theme.fg, 0.35) }]}>
+              {filledMonths} / 12개월 기록됨
             </Text>
-          )}
-        </View>
+            <Pressable
+              style={({ pressed }) => [
+                styles.finaleBtn,
+                { borderColor: withAlpha(theme.fg, 0.28), backgroundColor: pressed ? withAlpha(theme.fg, 0.06) : 'transparent' },
+              ]}
+              onPress={() => setFinale(true)}
+            >
+              <Text style={[styles.finaleBtnText, { color: withAlpha(theme.fg, 0.5) }]}>
+                {year} 결산 보기
+              </Text>
+            </Pressable>
+            <Text style={[styles.finaleTeaser, { color: withAlpha(theme.fg, 0.3) }]}>
+              한 해 동안 남긴 문장과 달성 궤적을 한 편의 결산으로 되짚어드려요
+            </Text>
+          </View>
+        )}
+
+        {/* 캐비닛 캡션 — 서랍 화면 맨 아래, 백업 복원 링크 바로 위 */}
+        <Text style={[styles.cabinetCaption, { color: withAlpha(theme.fg, 0.4), marginTop: 18 }]}>
+          {hasAnyEntry
+            ? '월을 열어 그 달의 기록을 꺼내보세요'
+            : '첫 문장을 남기면 이 서랍이 채워지기 시작해요'}
+        </Text>
 
         {/* 백업 복원 — 서랍의 맨 아래, 존재감 없이 */}
         <Pressable onPress={doImport} hitSlop={8} style={styles.importRow}>
@@ -528,7 +523,7 @@ const styles = StyleSheet.create({
   cabinetWrap: { flex: 1, justifyContent: 'center' },
   // 넓은 화면: 캐비닛을 위쪽에 두되(캡션이 위 여백 담당), 아래 여백은 하단 스페이서가 담당
   // 주의: flex:0은 웹에서 flex-basis:0%가 되어 높이가 0으로 붕괴 → 명시적으로 auto 지정
-  cabinetWrapPad: { flexGrow: 0, flexShrink: 0, flexBasis: 'auto', justifyContent: 'flex-start', marginTop: 20 },
+  cabinetWrapPad: { flexGrow: 0, flexShrink: 0, flexBasis: 'auto', justifyContent: 'flex-start', marginTop: 64 },
 
   // 캐비닛: 바깥 테두리 + 셀들의 내부 헤어라인이 하나의 격자를 이룬다
   cabinet: {

@@ -2,7 +2,8 @@
 // 화면 중앙에 'Tracker List' 볼드 텍스트 + 우상향 꺾은선 로고 드로잉 애니메이션
 
 import React, { useEffect, useRef } from 'react';
-import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '../components/Typography';
 import LogoMark from '../components/LogoMark';
 import { Theme, withAlpha } from '../theme';
 
@@ -61,6 +62,7 @@ const styles = StyleSheet.create({
     fontSize: 34,
     fontWeight: '800',
     letterSpacing: 1,
+    fontFamily: 'ChosunSm',
   },
   logoWrap: { marginTop: 28 },
   hint: {
@@ -68,5 +70,6 @@ const styles = StyleSheet.create({
     bottom: 64,
     fontSize: 13,
     letterSpacing: 0.5,
+    fontFamily: 'ChosunSm',
   },
 });

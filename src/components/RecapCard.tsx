@@ -4,7 +4,8 @@
 // 카드 비율은 4:5(340x425) 고정 — 인스타그램 세로 포스트 규격
 
 import React, { useMemo } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { Text } from './Typography';
 import LiveGraph, { GraphPoint } from './LiveGraph';
 import { Theme, withAlpha } from '../theme';
 import {

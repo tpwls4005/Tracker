@@ -48,7 +48,10 @@ export default function App() {
   const prevScreen = useRef<Screen>('landing');
 
   // 앱 폰트(조선신명조) 로드 — 웹·네이티브 공통 임베드
-  const [fontsLoaded] = useFonts({ ChosunSm: require('./assets/fonts/ChosunSm.ttf') });
+  const [fontsLoaded, fontError] = useFonts({ ChosunSm: require('./assets/fonts/ChosunSm.ttf') });
+  useEffect(() => {
+    console.log('[font] loaded=', fontsLoaded, 'error=', fontError);
+  }, [fontsLoaded, fontError]);
 
   // 전환 방향 계산용: 렌더 후 이전 화면 기록
   useEffect(() => {

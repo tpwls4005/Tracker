@@ -10,10 +10,9 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
-  TextInput,
   View,
 } from 'react-native';
+import { Text, TextInput } from '../components/Typography';
 import LiveGraph, { GraphPoint } from '../components/LiveGraph';
 import { OPACITY, Theme, withAlpha } from '../theme';
 import {

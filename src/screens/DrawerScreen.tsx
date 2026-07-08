@@ -12,11 +12,10 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
-  TextInput,
   useWindowDimensions,
   View,
 } from 'react-native';
+import { Text, TextInput } from '../components/Typography';
 import Svg, { Circle, Line as SvgLine, Path as SvgPath } from 'react-native-svg';
 import LiveGraph, { GraphPoint } from '../components/LiveGraph';
 import FinaleOverlay from '../components/FinaleOverlay';

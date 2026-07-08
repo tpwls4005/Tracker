@@ -2,7 +2,8 @@
 // 웹: html-to-image로 카드를 PNG 캡처(다운로드/파일공유). 네이티브: 텍스트 공유로 폴백.
 
 import React, { useRef, useState } from 'react';
-import { Modal, Platform, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
+import { Modal, Platform, Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
+import { Text } from './Typography';
 import RecapCard from './RecapCard';
 import { Theme, withAlpha } from '../theme';
 import {

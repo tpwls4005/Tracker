@@ -14,10 +14,10 @@ import {
   Platform,
   Pressable,
   StyleSheet,
-  Text,
   useWindowDimensions,
   View,
 } from 'react-native';
+import { Text } from './Typography';
 import Svg, { Path, Circle, Line, Text as SvgText } from 'react-native-svg';
 import ShareSheet from './ShareSheet';
 import { OPACITY, Theme, withAlpha } from '../theme';
@@ -290,6 +290,7 @@ export default function FinaleOverlay({ theme, data, year, onClose }: Props) {
                       x={xFor(t.idx) + 4}
                       y={graphH - 30}
                       fontSize={11}
+                      fontFamily="ChosunSm"
                       fill={withAlpha(theme.fg, 0.4)}
                     >
                       {t.label}

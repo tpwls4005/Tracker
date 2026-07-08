@@ -230,7 +230,7 @@ export default function LiveGraph({
 import { Text as SvgText } from 'react-native-svg';
 function SvgLabel({ x, y, color, text }: { x: number; y: number; color: string; text: string }) {
   return (
-    <SvgText x={x} y={y} fontSize={10} fill={color} textAnchor="middle">
+    <SvgText x={x} y={y} fontSize={10} fontFamily="ChosunSm" fill={color} textAnchor="middle">
       {text}
     </SvgText>
   );

@@ -509,8 +509,8 @@ const styles = StyleSheet.create({
   checkMark: { fontSize: 14, fontWeight: '900', lineHeight: 16 },
   habitLabel: { fontSize: 16, flex: 1 },
 
-  tlRow: { flexDirection: 'row', paddingVertical: 7 },
-  tlDay: { width: 28, fontSize: 13, fontWeight: '700' },
+  tlRow: { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 7 },
+  tlDay: { width: 28, fontSize: 13, fontWeight: '700', lineHeight: 22 },
   tlText: { flex: 1, fontSize: 15, lineHeight: 22 },
 
   // 모달
